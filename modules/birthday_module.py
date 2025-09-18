@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 STAFF_CSV = os.getenv("STAFF_CSV", "config/staff.csv")
-CHANNEL = os.getenv("BIRTHDAY_CHANNEL", "general")
+ADMINS = [admin.strip() for admin in os.getenv("BIRTHDAY_ADMINS", "chinmay govind").split(",")]
 CHECK_INTERVAL = int(os.getenv("BIRTHDAY_CHECK_INTERVAL", "600"))  # seconds
 logger = get_logger("birthday_module")
 
@@ -39,15 +39,34 @@ async def main():
     slack = SlackHelper()
     staff = load_staff_birthdays(STAFF_CSV)
     wished = set()
+
+    # Format birthday table as text
+    table_header = f"{'Name':<20} | {'Birthday':<10}\n" + ("-" * 33)
+    table_rows = [f"{member['name']:<20} | {member['birthday']:<10}" for member in staff]
+    birthday_table = table_header + "\n" + "\n".join(table_rows)
+
+    # Send birthday table to all admins on startup
+    for admin in ADMINS:
+        user_id = slack.find_user(admin)
+        if user_id:
+            slack.send_message(user_id, f"Staff Birthday List:\n{birthday_table}")
+            logger.info(f"Sent birthday table to admin {admin}")
+        else:
+            logger.error(f"Could not find Slack user for admin: {admin}")
+
     while True:
         now = datetime.now()
         if now.hour == 0:  # 12am
             for member in staff:
                 if is_today_birthday(member['birthday']) and member['name'] not in wished:
-                    msg = f"Happy Birthday, {member['name']}! :tada:"
-                    channel_id = slack.find_channel(CHANNEL)
-                    slack.send_message(channel_id, msg)
-                    logger.info(f"Sent birthday message for {member['name']} to {CHANNEL}")
+                    msg = f"It's {member['name']}'s birthday today! ({member['birthday']}) :tada:"
+                    for admin in ADMINS:
+                        user_id = slack.find_user(admin)
+                        if user_id:
+                            slack.send_message(user_id, msg)
+                            logger.info(f"Sent birthday notification for {member['name']} to admin {admin}")
+                        else:
+                            logger.error(f"Could not find Slack user for admin: {admin}")
                     wished.add(member['name'])
         # Reset wished set at midnight next day
         if now.hour == 1 and wished:
