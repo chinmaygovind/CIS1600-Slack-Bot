@@ -53,7 +53,8 @@ async def main():
                 )
                 slack.send_message(channel_id, message)
                 last_thread = updated_last_thread
-            logger.info(f"last seen thread: {last_thread} with link {get_link_from_id(id)}. Title: {thread_title}")
+                logger.info(f"New thread, send message {message.replace("\n", " ")}")
+            # logger.info(f"last seen thread: {last_thread} with link {get_link_from_id(id)}. Title: {thread_title}")
             await asyncio.sleep(REFRESH_INTERVAL)
         except Exception as e:
             logger.error(f"Error in EdModule: {e}")
