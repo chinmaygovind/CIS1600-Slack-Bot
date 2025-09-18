@@ -4,12 +4,14 @@ import asyncio
 
 
 
+
 import os
 import asyncio
 import re
 from edapi import EdAPI
 from utils import SlackHelper, get_logger
 from dotenv import load_dotenv
+from html_slacker import html2slack
 
 load_dotenv()
 
@@ -41,26 +43,8 @@ async def main():
             thread = ed.get_thread(id)
             thread_title = thread["title"]
             thread_content = thread["content"]
-            # Convert common Ed HTML tags to Slack formatting
-            def ed_html_to_slack(text):
-                # Replace paragraphs with newlines
-                text = re.sub(r'</?paragraph>', '\n', text)
-                # Replace <b> and <strong> with *bold*
-                text = re.sub(r'<(/)?(bold|strong)>', '*', text)
-                # Replace <i> and <em> with _italic_
-                text = re.sub(r'<(/)?(italic|em)>', '_', text)
-                # Replace <code> with backticks
-                text = re.sub(r'<code>', '`', text)
-                text = re.sub(r'</code>', '`', text)
-                # Replace <pre> with triple backticks
-                text = re.sub(r'<pre>', '```', text)
-                text = re.sub(r'</pre>', '```', text)
-                # Remove <document> tags
-                text = re.sub(r'</?document[^>]*>', '', text)
-                # Remove any remaining tags (optional, or leave as is)
-                return text.strip()
-
-            formatted_content = ed_html_to_slack(thread_content)
+            # Use html-slacker to convert Ed HTML to Slack formatting
+            formatted_content = html2slack(thread_content)
             if updated_last_thread > last_thread:
                 message = (
                     f"*New Ed Post (#{updated_last_thread}): {thread_title}*\n"

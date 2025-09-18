@@ -1,3 +1,4 @@
 edapi
 slack_sdk
 python-dotenv
+html-slacker
