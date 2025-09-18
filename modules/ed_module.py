@@ -71,7 +71,7 @@ async def main():
                 )
                 slack.send_message(channel_id, message)
                 last_thread = updated_last_thread
-                logger.info(f"New thread, sendtmessage {message.replace('\\n', ' ')}")
+                logger.info(f"New thread, sent message {message}")
             # logger.info(f"last seen thread: {last_thread} with link {get_link_from_id(id)}. Title: {thread_title}")
             await asyncio.sleep(REFRESH_INTERVAL)
         except Exception as e:
