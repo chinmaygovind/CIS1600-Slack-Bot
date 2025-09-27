@@ -16,7 +16,7 @@ REMINDER_MESSAGE = "Reminder to submit hours on Workday by 6PM!"
 async def main():
     slack = SlackHelper()
     # Notify SYS_ADMIN on startup
-    admin_id = slack.find_user(SYS_ADMIN)
+    admin_id = slack.find_user_id(SYS_ADMIN)
     if admin_id:
         slack.send_message(admin_id, "reminder_module started and running.")
         logger.info(f"Sent startup message to SYS_ADMIN: {SYS_ADMIN}")
