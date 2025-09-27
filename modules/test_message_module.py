@@ -1,8 +1,12 @@
 
 import asyncio
 from utils import SlackHelper, get_logger
+from dotenv import load_dotenv
+import os
 
-USER_NAME = "chinmay govind"
+load_dotenv()
+
+USER_NAME = os.getenv("SYS_ADMIN")
 REFRESH_INTERVAL = 30  # seconds
 logger = get_logger("test_message_module")
 

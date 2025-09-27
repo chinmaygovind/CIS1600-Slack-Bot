@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 CHANNEL = "general"
-SYS_ADMIN = os.getenv("SYS_ADMIN", "chinmay govind")
+SYS_ADMIN = os.getenv("SYS_ADMIN")
 CHECK_INTERVAL = 60  # seconds
 logger = get_logger("reminder_module")
 
