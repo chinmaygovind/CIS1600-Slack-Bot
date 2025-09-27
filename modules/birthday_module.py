@@ -21,15 +21,15 @@ def load_staff_birthdays(csv_path):
         for row in reader:
             # Expecting columns: name, birthday (YYYY-MM-DD)
             staff.append({
-                'name': row['name'],
-                'birthday': row['birthday']
+                'name': row['Name'],
+                'birthday': row['Birthday']
             })
     return staff
 
 def is_today_birthday(birthday_str):
     today = datetime.now().date()
     try:
-        bday = datetime.strptime(birthday_str, "%Y-%m-%d").date()
+        bday = datetime.strptime(birthday_str, "%m/%d/%Y").date()
         return bday.month == today.month and bday.day == today.day
     except Exception as e:
         logger.error(f"Invalid birthday format: {birthday_str} ({e})")
@@ -38,6 +38,14 @@ def is_today_birthday(birthday_str):
 async def main():
     slack = SlackHelper()
     staff = load_staff_birthdays(STAFF_CSV)
+    # Sort staff by birthday (month, day)
+    def birthday_key(member):
+        try:
+            bday = datetime.strptime(member['birthday'], "%m/%d/%Y")
+            return (bday.month, bday.day)
+        except Exception:
+            return (13, 32)  # Put invalid dates at the end
+    staff.sort(key=birthday_key)
     wished = set()
 
     # Format birthday table as text
@@ -47,7 +55,7 @@ async def main():
 
     # Send birthday table to all admins on startup
     for admin in ADMINS:
-        user_id = slack.find_user(admin)
+        user_id = slack.find_user_id(admin)
         if user_id:
             slack.send_message(user_id, f"Staff Birthday List:\n{birthday_table}")
             logger.info(f"Sent birthday table to admin {admin}")
@@ -61,7 +69,7 @@ async def main():
                 if is_today_birthday(member['birthday']) and member['name'] not in wished:
                     msg = f"It's {member['name']}'s birthday today! ({member['birthday']}) :tada:"
                     for admin in ADMINS:
-                        user_id = slack.find_user(admin)
+                        user_id = slack.find_user_id(admin)
                         if user_id:
                             slack.send_message(user_id, msg)
                             logger.info(f"Sent birthday notification for {member['name']} to admin {admin}")

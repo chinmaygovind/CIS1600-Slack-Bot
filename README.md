@@ -1,11 +1,6 @@
 # CIS1600 Slack Bot
 
-This bot monitors Ed Discussion posts for your CIS1600 course and sends notifications to a Slack channel.
-
-## Features
-- Converts Ed HTML to Slack formatting using `html-slacker`
-- Notifies Slack channel of new Ed posts
-- Configurable via `.env` file
+This bot has utilities to help the CIS 1600 Slack.
 
 ## Setup Instructions
 
@@ -43,25 +38,37 @@ SLACK_CHANNEL=ed-notifications
 REFRESH_INTERVAL_SECONDS=10
 ```
 
-### 5. Run the Bot
 
-#### On Windows (using batch script):
-Use the provided batch script to run any module and save logs automatically:
-```
-run_module.bat ed_module
-```
-This will run the module in the background and save logs to `logs/ed_module_logs_<date>.log`.
-You can replace `ed_module` with any other module name (e.g., `birthday_module`).
+### 5. Orchestrator: Manage All Bots
 
+Use the orchestrator CLI to view, start, and stop all modules from one place.
 
-#### On Linux/EC2 (using shell script):
-Use the provided shell script to run any module and save logs automatically:
+#### Start the orchestrator:
 ```
-chmod +x run_module.sh
-./run_module.sh ed_module
+python orchestrator.py
 ```
-This will run the module in the background and save logs to `logs/ed_module_logs_<date>.log`.
-You can replace `ed_module` with any other module name (e.g., `birthday_module`).
+
+#### Orchestrator commands:
+- `status` — Show status of all modules (running/stopped, PID, start time, file modified)
+- `start X` — Start module number X (from status table)
+- `start all` — Start all modules
+- `stop X` — Stop module number X (from status table)
+- `stop all` — Stop all modules
+- `help` — Show all commands
+- `exit` — Exit the orchestrator
+
+#### Add a new module to orchestrator:
+1. Create your module in the `modules/` folder (e.g., `modules/reminder_module.py`).
+2. Add the module name (without `.py`) to the `MODULES` list in `orchestrator.py`:
+   ```python
+   MODULES = [
+     "ed_module",
+     "birthday_module",
+     "test_message_module",
+     "reminder_module"
+   ]
+   ```
+3. Save and re-run `python orchestrator.py`. The new module will appear in the CLI.
 
 ### 6. View Logs
 To view the logs:

@@ -2,3 +2,5 @@ edapi
 slack_sdk
 python-dotenv
 html-slacker
+flask
+psutil
