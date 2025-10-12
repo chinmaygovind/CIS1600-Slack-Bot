@@ -3,6 +3,7 @@ import asyncio
 from datetime import datetime, timedelta
 from utils import SlackHelper, get_logger
 from dotenv import load_dotenv
+import pytz
 
 load_dotenv()
 
@@ -27,9 +28,10 @@ async def main():
         logger.error(f"Could not find Slack user for SYS_ADMIN: {SYS_ADMIN}")
 
     sent_this_week = False
+    eastern = pytz.timezone("US/Eastern")
     while True:
-        now = datetime.now()
-        logger.debug(f"Current time: {now}, sent_this_week: {sent_this_week}")
+        now = datetime.now(tz=eastern)
+        logger.debug(f"Current time (Eastern): {now}, sent_this_week: {sent_this_week}")
         # Sunday is 6 (Monday=0, Sunday=6)
         if now.weekday() == 6 and now.hour == 16:
             if not sent_this_week:

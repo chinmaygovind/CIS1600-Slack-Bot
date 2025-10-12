@@ -47,7 +47,7 @@ def start_module(module):
     logfile = os.path.join(LOGS_DIR, f"{module}_logs.log")
     subprocess.Popen([
         sys.executable, "-m", f"modules.{module}"
-    ], stdout=open(logfile, "a"), stderr=subprocess.STDOUT)
+    ])
 
 def stop_module(module):
     for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
