@@ -28,15 +28,20 @@ pip3 install -r requirements.txt
 ```
 
 ### 4. Configure Environment Variables
-Create a `.env` file in the project root with your credentials:
-```
-ED_API_TOKEN=your_ed_api_token
-ED_REGION=us
-ED_COURSE_ID=your_course_id
-SLACK_API_TOKEN=your_slack_api_token
-SLACK_CHANNEL=ed-notifications
-REFRESH_INTERVAL_SECONDS=10
-```
+Create a `.env` file in the project root with your credentials.
+
+#### General
+- `SLACK_API_TOKEN`: Your Slack API token for the bot to communicate with Slack.
+
+#### Ed Module (`ed_module.py`)
+- `ED_API_TOKEN`: Your Ed Discussion API token.
+- `ED_REGION`: The region for your Ed Discussion instance (e.g., `us`).
+- `ED_COURSE_ID`: The ID of your course on Ed Discussion.
+- `SLACK_CHANNEL`: The Slack channel for Ed notifications (e.g., `ed-notifications`).
+- `REFRESH_INTERVAL_SECONDS`: How often to check for new posts (e.g., `10`).
+
+#### Birthday Module (`birthday_module.py`)
+- `BIRTHDAY_ADMINS`: A comma-separated list of Slack user IDs for birthday announcements admins (e.g. "chinmay govind", "David Fu").
 
 
 ### 5. Orchestrator: Manage All Bots
