@@ -17,7 +17,7 @@ REMINDER_MESSAGE = "Reminder to submit hours on Workday by 6PM!"
 # REMINDER_MESSAGE = "test message"
 
 async def main():
-    slack = SlackHelper()
+    slack = SlackHelper("reminder_module")
     logger.info("Initializing SlackHelper and starting reminder module.")
     # Notify SYS_ADMIN on startup
     admin_id = slack.find_user_id(SYS_ADMIN)

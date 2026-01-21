@@ -4,3 +4,8 @@ python-dotenv
 html-slacker
 flask
 psutil
+requests
+pandas
+python-dateutil
+plotly
+tqdm

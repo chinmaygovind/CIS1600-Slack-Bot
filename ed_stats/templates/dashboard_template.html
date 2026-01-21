@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ED Stats Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body { font-family: Inter, Roboto, Arial, sans-serif; margin: 24px; background:#f7fafc; color:#0f172a }
+    .container { max-width:1200px; margin:0 auto }
+    header { display:flex; align-items:center; justify-content:space-between }
+    h1 { margin:0; font-size:20px }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:18px; margin-top:18px }
+    .card { background:white; padding:16px; border-radius:8px; box-shadow: 0 2px 8px rgba(15,23,42,0.06) }
+    table { width:100%; border-collapse:collapse }
+    th, td { text-align:left; padding:8px; border-bottom:1px solid #eef2f7 }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>ED Stats Dashboard</h1>
+    <div id="summary"></div>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Leaderboard (Most responses)</h3>
+      <div id="leaderboard"></div>
+    </div>
+    <div class="card">
+      <h3>Average Response Time (mins)</h3>
+      <div id="avg_response"></div>
+    </div>
+    <div class="card" style="grid-column:1 / -1">
+      <h3>Response Time Distribution</h3>
+      <div id="histogram"></div>
+    </div>
+    <div class="card" style="grid-column:1 / -1">
+      <h3>Recent Questions & Response Times</h3>
+      <div id="posts_table"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Injected data
+const DATA = __DATA_PAYLOAD__;
+
+function niceSecs(s) {
+  if (s == null) return '-';
+  const mins = Math.round(s/60);
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins/60);
+  const rm = mins % 60;
+  return `${h}h ${rm}m`;
+}
+
+// Leaderboard
+const lb = DATA.leaderboard || [];
+if (lb.length === 0) {
+  document.getElementById('leaderboard').innerText = 'No data';
+} else {
+  const names = lb.map(x => x.staff);
+  const vals = lb.map(x => x.responses);
+  const trace = { x: vals.reverse(), y: names.reverse(), type: 'bar', orientation: 'h', marker:{color:'#0ea5a4'} };
+  Plotly.newPlot('leaderboard',[trace],{margin:{l:140}});
+}
+
+// Average response
+const avg = DATA.avg_response || [];
+if (avg.length === 0) {
+  document.getElementById('avg_response').innerText = 'No data';
+} else {
+  const names = avg.map(x => x.staff);
+  const vals = avg.map(x => x.avg_response_mins);
+  const trace = { x: names, y: vals, type: 'bar', marker:{color:'#6366f1'} };
+  Plotly.newPlot('avg_response',[trace],{yaxis:{title:'Minutes'}});
+}
+
+// Histogram of response times per post
+const per_post = DATA.per_post || [];
+const response_secs = per_post.map(p => p.response_seconds).filter(x=>x!=null);
+if (response_secs.length === 0) {
+  document.getElementById('histogram').innerText = 'No response time data';
+} else {
+  const trace = { x: response_secs.map(s=>s/60), type:'histogram', marker:{color:'#f97316'} };
+  Plotly.newPlot('histogram',[trace],{xaxis:{title:'Response time (minutes)'}});
+}
+
+// Posts table
+function formatCreated(value){
+  if (!value) return '-';
+  try{
+    // if it's numeric (epoch ms)
+    if (typeof value === 'number') return new Date(value).toLocaleString();
+    // if it's a string that contains digits only (ms)
+    if (typeof value === 'string' && /^\d+$/.test(value)){
+      const n = Number(value);
+      return new Date(n).toLocaleString();
+    }
+    // otherwise try to parse as ISO
+    const d = new Date(value);
+    if (!isNaN(d)) return d.toLocaleString();
+    return String(value);
+  } catch(e){ return String(value); }
+}
+
+function makeTable(rows){
+  if (!rows || rows.length===0) return 'No posts';
+  let html = '<table><thead><tr><th>Post</th><th>Created</th><th>First Responder</th><th>Response Time</th><th>Replies</th></tr></thead><tbody>';
+  rows.slice(0,50).forEach(r=>{
+    html += `<tr><td>${r.title}</td><td>${formatCreated(r.created)}</td><td>${r.first_responder || '-'}</td><td>${niceSecs(r.response_seconds)}</td><td>${r.num_replies}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  return html;
+}
+document.getElementById('posts_table').innerHTML = makeTable(per_post.sort((a,b)=> new Date(b.created||0)-new Date(a.created||0)));
+
+// Summary
+const overall = DATA.overall_avg_seconds;
+const summary = document.getElementById('summary');
+summary.innerHTML = `<div style="text-align:right">Overall avg response: ${overall? niceSecs(overall): '-'} </div>`;
+</script>
+</body>
+</html>

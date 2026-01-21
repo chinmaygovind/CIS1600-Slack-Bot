@@ -36,7 +36,7 @@ def is_today_birthday(birthday_str):
         return False
 
 async def main():
-    slack = SlackHelper()
+    slack = SlackHelper("birthday_module")
     staff = load_staff_birthdays(STAFF_CSV)
     # Sort staff by birthday (month, day)
     def birthday_key(member):

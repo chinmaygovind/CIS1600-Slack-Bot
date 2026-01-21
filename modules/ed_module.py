@@ -32,7 +32,7 @@ def get_max_thread_number(ed):
     return latest_thread["number"], latest_thread["id"]
 
 async def main():
-    slack = SlackHelper()
+    slack = SlackHelper("ed_module")
     ed = EdAPI()
     channel_id = slack.find_channel(SLACK_CHANNEL)
     last_thread, _ = get_max_thread_number(ed)

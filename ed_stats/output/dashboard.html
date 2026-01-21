@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ED Stats Dashboard</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body { font-family: Inter, Roboto, Arial, sans-serif; margin: 24px; background:#f7fafc; color:#0f172a }
+    .container { max-width:1200px; margin:0 auto }
+    header { display:flex; align-items:center; justify-content:space-between }
+    h1 { margin:0; font-size:20px }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:18px; margin-top:18px }
+    .card { background:white; padding:16px; border-radius:8px; box-shadow: 0 2px 8px rgba(15,23,42,0.06) }
+    table { width:100%; border-collapse:collapse }
+    th, td { text-align:left; padding:8px; border-bottom:1px solid #eef2f7 }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>ED Stats Dashboard</h1>
+    <div id="summary"></div>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Leaderboard (Most responses)</h3>
+      <div id="leaderboard"></div>
+    </div>
+    <div class="card">
+      <h3>Average Response Time (mins)</h3>
+      <div id="avg_response"></div>
+    </div>
+    <div class="card" style="grid-column:1 / -1">
+      <h3>Response Time Distribution</h3>
+      <div id="histogram"></div>
+    </div>
+    <div class="card" style="grid-column:1 / -1">
+      <h3>Recent Questions & Response Times</h3>
+      <div id="posts_table"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Injected data
+const DATA = {"per_post": [{"post_id": 7300463, "title": "HW 12H Released + FAQ", "created": "2025-11-13T09:07:53.842293+11:00", "first_responder": null, "response_seconds": null, "num_replies": 1}, {"post_id": 7293199, "title": "[IMPORTANT] Midterm 2 Information", "created": "2025-11-12T05:55:15.056445+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7287441, "title": "Important Posts Thread (Compilation)", "created": "2025-11-11T06:49:04.008866+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7297174, "title": "HW 10H/11T Grades Released", "created": "2025-11-12T17:31:33.844352+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7288500, "title": "Intro CIS TA Applications", "created": "2025-11-11T09:03:19.810538+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7276405, "title": "Collaboration Policy Violations", "created": "2025-11-08T16:38:41.095234+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7255268, "title": "[IMPORTANT] Sample Space Clarifications", "created": "2025-11-05T06:05:19.769949+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7142811, "title": "Collaboration Policy", "created": "2025-10-17T03:34:31.281233+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7161623, "title": "Midterm 1 Grades", "created": "2025-10-20T15:24:32.071854+11:00", "first_responder": null, "response_seconds": null, "num_replies": 3}, {"post_id": 6896710, "title": "Homework Statistics", "created": "2025-09-01T08:08:09.329279+10:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 6877981, "title": "Office Hours Logistics and Etiquette", "created": "2025-08-26T22:00:00.152465+10:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 6864845, "title": "Welcome to CIS 1600 + Navigation!", "created": "2025-08-19T13:46:35.611410+10:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7302997, "title": "12H #3", "created": "2025-11-13T16:19:55.004737+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7302858, "title": "12T", "created": "2025-11-13T15:51:05.775713+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7302783, "title": "HW 12T", "created": "2025-11-13T15:34:24.407128+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7302548, "title": "Complete Bipartite Graph", "created": "2025-11-13T14:52:05.652856+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7302520, "title": "Bipartite Graphs", "created": "2025-11-13T14:47:52.770978+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7302478, "title": "Trees", "created": "2025-11-13T14:38:40.164241+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7302432, "title": "longest path 12t q2b", "created": "2025-11-13T14:30:44.689583+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7301038, "title": "12T", "created": "2025-11-13T10:32:36.167361+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7300882, "title": "Office Hour Help", "created": "2025-11-13T10:08:20.728778+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7300687, "title": "Using something from a previous HW in a current HW", "created": "2025-11-13T09:41:31.490189+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7300509, "title": "What does T > n mean in HW12T Q1?", "created": "2025-11-13T09:13:15.686094+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7300389, "title": "12T 2B", "created": "2025-11-13T08:56:48.442723+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7298789, "title": "12t q2", "created": "2025-11-13T04:58:56.611739+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7298197, "title": "HW 9H Solution", "created": "2025-11-13T03:07:56.236825+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7298004, "title": "Probability Space Intuition", "created": "2025-11-13T02:28:12.069570+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7297156, "title": "12T Q2", "created": "2025-11-12T17:25:48.542250+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7296949, "title": "Last Homework before midterm 2", "created": "2025-11-12T16:26:16.058275+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7296596, "title": "12T Q2", "created": "2025-11-12T15:01:48.876459+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7296168, "title": "12T", "created": "2025-11-12T13:39:05.260744+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7295146, "title": "Hall's theorem", "created": "2025-11-12T10:47:28.686858+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7295091, "title": "Strong Induction", "created": "2025-11-12T10:39:08.963576+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7294861, "title": "12 T Q2 A", "created": "2025-11-12T10:00:07.739753+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7294672, "title": "12T Q1", "created": "2025-11-12T09:34:18.868338+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7294198, "title": "Midterm 2 Practice Problems P3", "created": "2025-11-12T08:25:51.758404+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7293887, "title": "HW", "created": "2025-11-12T07:40:15.855311+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7291547, "title": "11H proof question", "created": "2025-11-11T19:06:06.654250+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7291452, "title": "midterm 2", "created": "2025-11-11T18:15:55.762584+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7290885, "title": "Closed Form?", "created": "2025-11-11T15:44:41.995041+11:00", "first_responder": null, "response_seconds": null, "num_replies": 1}, {"post_id": 7290856, "title": "Lecture 11H", "created": "2025-11-11T15:39:25.070984+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7290584, "title": "11H Q1", "created": "2025-11-11T14:47:00.228646+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7290261, "title": "12T Q1", "created": "2025-11-11T13:52:08.851001+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7290217, "title": "11H #3", "created": "2025-11-11T13:45:40.317420+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7290084, "title": "11H #3", "created": "2025-11-11T13:24:44.530961+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7289843, "title": "11H #2 part c", "created": "2025-11-11T12:40:40.568904+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7289793, "title": "Intro CIS TA Application Question", "created": "2025-11-11T12:32:35.566192+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7289570, "title": "No-vertices graphs", "created": "2025-11-11T11:56:51.390140+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7289560, "title": "Removing an edge from a connected graph", "created": "2025-11-11T11:54:22.322765+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7289485, "title": "q3", "created": "2025-11-11T11:40:33.924133+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7289421, "title": "11H #1", "created": "2025-11-11T11:32:26.315543+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7289401, "title": "Properties of Expectation and Variance", "created": "2025-11-11T11:29:25.939707+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7289344, "title": "11h 2", "created": "2025-11-11T11:19:41.128331+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7289279, "title": "HW 11H #1 parts d and e", "created": "2025-11-11T11:08:47.128078+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7289214, "title": "q3 hw11h", "created": "2025-11-11T10:57:52.803981+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7289156, "title": "Variance", "created": "2025-11-11T10:47:50.640395+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7289154, "title": "11H #1 part d", "created": "2025-11-11T10:47:35.531033+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7288867, "title": "Binomial Distribution Probability Mass Function", "created": "2025-11-11T10:07:28.905416+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7288551, "title": "HW 12T Released + FAQ", "created": "2025-11-11T09:14:55.570592+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7288152, "title": "Do we need to prove that E[A - B] = E[A] - E[B]?", "created": "2025-11-11T08:22:17.165005+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7288149, "title": "11H Q4", "created": "2025-11-11T08:21:44.911566+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7287973, "title": "11H Q3", "created": "2025-11-11T08:01:27.916285+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7287517, "title": "Q1 d", "created": "2025-11-11T07:00:04.918940+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7287376, "title": "11H 1 f", "created": "2025-11-11T06:40:31.586671+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7286622, "title": "Eulerian Walks", "created": "2025-11-11T04:45:36.194131+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7285269, "title": "11H #4", "created": "2025-11-10T19:14:21.442918+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7284823, "title": "11H q1", "created": "2025-11-10T16:29:25.959374+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7284290, "title": "11H Q5", "created": "2025-11-10T14:46:20.287043+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7284191, "title": "11h q2", "created": "2025-11-10T14:29:49.114624+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7284114, "title": "11h q3", "created": "2025-11-10T14:16:24.779643+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7284045, "title": "Q2 11H", "created": "2025-11-10T14:05:36.161985+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7283978, "title": "11H q3", "created": "2025-11-10T13:54:26.854397+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7283733, "title": "11H Q3", "created": "2025-11-10T13:06:18.547054+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7283612, "title": "11H #2", "created": "2025-11-10T12:51:01.303761+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7283159, "title": "Last recitation problems", "created": "2025-11-10T11:32:12.793998+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7283085, "title": "Variance", "created": "2025-11-10T11:19:03.379051+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7282726, "title": "11h q5", "created": "2025-11-10T10:08:12.620350+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7282698, "title": "Graph Colorings", "created": "2025-11-10T10:03:15.940186+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7282612, "title": "HW 11H", "created": "2025-11-10T09:49:22.116522+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7282600, "title": "Incomplete Recitation 10 Solutions", "created": "2025-11-10T09:47:06.188174+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7282350, "title": "Multiplication Rule and Independence", "created": "2025-11-10T09:03:19.203183+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7282175, "title": "11h q1(d)", "created": "2025-11-10T08:30:50.972930+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7282108, "title": "X(G) degree", "created": "2025-11-10T08:21:13.184038+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7281916, "title": "11h Q4", "created": "2025-11-10T07:46:05.700575+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7281491, "title": "11H #4", "created": "2025-11-10T06:28:09.842747+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7281023, "title": "Variance Properties", "created": "2025-11-10T04:32:27.218356+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7278735, "title": "Graph induction", "created": "2025-11-09T10:06:14.858556+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7278618, "title": "Last recitation.", "created": "2025-11-09T09:44:50.668087+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7278617, "title": "HW 11H Q5 Clarification", "created": "2025-11-09T09:44:47.109766+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7278421, "title": "Binary tree being a root or no", "created": "2025-11-09T09:08:32.360146+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7277970, "title": "Q5", "created": "2025-11-09T07:18:01.129400+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7277659, "title": "Graph Proof Technique", "created": "2025-11-09T06:05:37.785951+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7276420, "title": "Regrade request still in review", "created": "2025-11-08T16:43:09.506522+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7275001, "title": "Probability Distributions", "created": "2025-11-08T10:31:07.447504+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7269542, "title": "Bipartite Graphs", "created": "2025-11-07T09:42:30.394986+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7267822, "title": "Binomial Variance", "created": "2025-11-07T05:34:12.661300+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7267661, "title": "11H Q1", "created": "2025-11-07T05:08:46.505371+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7267620, "title": "11H #3", "created": "2025-11-07T05:02:50.882596+11:00", "first_responder": null, "response_seconds": null, "num_replies": 1}, {"post_id": 7265942, "title": "HW 11H Released + FAQ", "created": "2025-11-06T17:39:08.284216+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}, {"post_id": 7265401, "title": "11H latex file", "created": "2025-11-06T15:18:18.753152+11:00", "first_responder": null, "response_seconds": null, "num_replies": 0}], "leaderboard": [], "avg_response": [], "overall_avg_seconds": NaN};
+
+function niceSecs(s) {
+  if (s == null) return '-';
+  const mins = Math.round(s/60);
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins/60);
+  const rm = mins % 60;
+  return `${h}h ${rm}m`;
+}
+
+// Leaderboard
+const lb = DATA.leaderboard || [];
+if (lb.length === 0) {
+  document.getElementById('leaderboard').innerText = 'No data';
+} else {
+  const names = lb.map(x => x.staff);
+  const vals = lb.map(x => x.responses);
+  const trace = { x: vals.reverse(), y: names.reverse(), type: 'bar', orientation: 'h', marker:{color:'#0ea5a4'} };
+  Plotly.newPlot('leaderboard',[trace],{margin:{l:140}});
+}
+
+// Average response
+const avg = DATA.avg_response || [];
+if (avg.length === 0) {
+  document.getElementById('avg_response').innerText = 'No data';
+} else {
+  const names = avg.map(x => x.staff);
+  const vals = avg.map(x => x.avg_response_mins);
+  const trace = { x: names, y: vals, type: 'bar', marker:{color:'#6366f1'} };
+  Plotly.newPlot('avg_response',[trace],{yaxis:{title:'Minutes'}});
+}
+
+// Histogram of response times per post
+const per_post = DATA.per_post || [];
+const response_secs = per_post.map(p => p.response_seconds).filter(x=>x!=null);
+if (response_secs.length === 0) {
+  document.getElementById('histogram').innerText = 'No response time data';
+} else {
+  const trace = { x: response_secs.map(s=>s/60), type:'histogram', marker:{color:'#f97316'} };
+  Plotly.newPlot('histogram',[trace],{xaxis:{title:'Response time (minutes)'}});
+}
+
+// Posts table
+function formatCreated(value){
+  if (!value) return '-';
+  try{
+    // if it's numeric (epoch ms)
+    if (typeof value === 'number') return new Date(value).toLocaleString();
+    // if it's a string that contains digits only (ms)
+    if (typeof value === 'string' && /^\d+$/.test(value)){
+      const n = Number(value);
+      return new Date(n).toLocaleString();
+    }
+    // otherwise try to parse as ISO
+    const d = new Date(value);
+    if (!isNaN(d)) return d.toLocaleString();
+    return String(value);
+  } catch(e){ return String(value); }
+}
+
+function makeTable(rows){
+  if (!rows || rows.length===0) return 'No posts';
+  let html = '<table><thead><tr><th>Post</th><th>Created</th><th>First Responder</th><th>Response Time</th><th>Replies</th></tr></thead><tbody>';
+  rows.slice(0,50).forEach(r=>{
+    html += `<tr><td>${r.title}</td><td>${formatCreated(r.created)}</td><td>${r.first_responder || '-'}</td><td>${niceSecs(r.response_seconds)}</td><td>${r.num_replies}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  return html;
+}
+document.getElementById('posts_table').innerHTML = makeTable(per_post.sort((a,b)=> new Date(b.created||0)-new Date(a.created||0)));
+
+// Summary
+const overall = DATA.overall_avg_seconds;
+const summary = document.getElementById('summary');
+summary.innerHTML = `<div style="text-align:right">Overall avg response: ${overall? niceSecs(overall): '-'} </div>`;
+</script>
+</body>
+</html>
