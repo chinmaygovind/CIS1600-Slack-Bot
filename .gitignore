@@ -1,3 +1,5 @@
 chinmay2.ppk
 .env
 logs/
+config/staff.csv
+__pycache__/

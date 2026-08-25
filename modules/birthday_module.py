@@ -1,14 +1,14 @@
 import os
 import asyncio
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from utils import SlackHelper, get_logger
 from dotenv import load_dotenv
 
 load_dotenv()
 
 STAFF_CSV = os.getenv("STAFF_CSV", "config/staff.csv")
-ADMINS = [admin.strip() for admin in os.getenv("BIRTHDAY_ADMINS", "chinmay govind").split(",")]
+ADMINS = [admin.strip() for admin in os.getenv("ADMINS", "Chinmay Govind").split(",")]
 CHECK_INTERVAL = int(os.getenv("BIRTHDAY_CHECK_INTERVAL", "600"))  # seconds
 logger = get_logger("birthday_module")
 
@@ -26,14 +26,46 @@ def load_staff_birthdays(csv_path):
             })
     return staff
 
-def is_today_birthday(birthday_str):
-    today = datetime.now().date()
+def parse_birthday(birthday_str):
     try:
-        bday = datetime.strptime(birthday_str, "%m/%d/%Y").date()
-        return bday.month == today.month and bday.day == today.day
+        return datetime.strptime(birthday_str, "%m/%d/%Y").date()
     except Exception as e:
         logger.error(f"Invalid birthday format: {birthday_str} ({e})")
+        return None
+
+def is_today_birthday(birthday_str):
+    today = datetime.now().date()
+    bday = parse_birthday(birthday_str)
+    if bday is None:
         return False
+    return bday.month == today.month and bday.day == today.day
+
+def days_until_birthday(birthday_str, today):
+    """Days from today until the next anniversary of this birthday (0 == today)."""
+    bday = parse_birthday(birthday_str)
+    if bday is None:
+        return None
+    def anniversary(year):
+        try:
+            return bday.replace(year=year)
+        except ValueError:  # Feb 29 in a non-leap year
+            return date(year, 3, 1)
+    upcoming = anniversary(today.year)
+    if upcoming < today:
+        upcoming = anniversary(today.year + 1)
+    return (upcoming - today).days
+
+def find_next_birthday(staff, today):
+    """The soonest birthday strictly after today. Ties break alphabetically."""
+    upcoming = []
+    for member in staff:
+        days = days_until_birthday(member['birthday'], today)
+        if days is not None and days > 0:
+            upcoming.append((days, member['name'], member))
+    if not upcoming:
+        return None
+    days, _, member = min(upcoming, key=lambda row: (row[0], row[1]))
+    return days, member
 
 async def main():
     slack = SlackHelper("birthday_module")
@@ -68,6 +100,14 @@ async def main():
             for member in staff:
                 if is_today_birthday(member['birthday']) and member['name'] not in wished:
                     msg = f"It's {member['name']}'s birthday today! ({member['birthday']}) :tada:"
+                    nxt = find_next_birthday(staff, now.date())
+                    if nxt:
+                        days, next_member = nxt
+                        plural = "" if days == 1 else "s"
+                        msg += (
+                            f"\nNext birthday: {next_member['name']} "
+                            f"({next_member['birthday']}) - in {days} day{plural}"
+                        )
                     for admin in ADMINS:
                         user_id = slack.find_user_id(admin)
                         if user_id:

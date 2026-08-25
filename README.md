@@ -41,7 +41,7 @@ Create a `.env` file in the project root with your credentials.
 - `REFRESH_INTERVAL_SECONDS`: How often to check for new posts (e.g., `10`).
 
 #### Birthday Module (`birthday_module.py`)
-- `BIRTHDAY_ADMINS`: A comma-separated list of Slack user IDs for birthday announcements admins (e.g. "chinmay govind", "David Fu").
+- `ADMINS`: A comma-separated list of Slack display names (the profile `real_name`, matched exactly) to notify (e.g. `Chinmay Govind,David Fu`).
 
 
 ### 5. Orchestrator: Manage All Bots

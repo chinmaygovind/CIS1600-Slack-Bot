@@ -9,7 +9,8 @@ MODULES = [
     "ed_module",
     "birthday_module",
     "test_message_module",
-    "reminder_module"
+    "reminder_module",
+    "status_module"
 ]
 MODULES_DIR = os.path.join(os.path.dirname(__file__), "modules")
 LOGS_DIR = os.path.join(os.path.dirname(__file__), "logs")
