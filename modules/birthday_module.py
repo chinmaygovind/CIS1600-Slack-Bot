@@ -67,6 +67,42 @@ def find_next_birthday(staff, today):
     days, _, member = min(upcoming, key=lambda row: (row[0], row[1]))
     return days, member
 
+def upcoming_birthdays(staff, today, count):
+    """The next `count` birthdays after today, soonest first."""
+    rows = []
+    for member in staff:
+        days = days_until_birthday(member['birthday'], today)
+        if days is not None and days > 0:
+            rows.append((days, member['name'], member))
+    rows.sort(key=lambda row: (row[0], row[1]))
+    return [(days, member) for days, _, member in rows[:count]]
+
+def build_startup_message(staff, today):
+    lines = ["*1600 Bot birthday module initialized!* :tada:"]
+
+    todays = [member for member in staff if is_today_birthday(member['birthday'])]
+    if todays:
+        lines.append(f":birthday: *Today:* {', '.join(m['name'] for m in todays)}")
+
+    upcoming = upcoming_birthdays(staff, today, 3)
+    if upcoming:
+        days, member = upcoming[0]
+        plural = "" if days == 1 else "s"
+        lines.append(
+            f"*Next birthday:* {member['name']} ({member['birthday']}) - in {days} day{plural}"
+        )
+        if len(upcoming) > 1:
+            rest = ", ".join(f"{m['name']} ({d}d)" for d, m in upcoming[1:])
+            lines.append(f"*Then:* {rest}")
+    else:
+        lines.append("No upcoming birthdays on file.")
+
+    lines.append(
+        f"_Tracking {len(staff)} staff from {STAFF_CSV}. "
+        f"Checking every {CHECK_INTERVAL}s; announcements go out at midnight._"
+    )
+    return "\n".join(lines)
+
 async def main():
     slack = SlackHelper("birthday_module")
     staff = load_staff_birthdays(STAFF_CSV)
@@ -80,17 +116,13 @@ async def main():
     staff.sort(key=birthday_key)
     wished = set()
 
-    # Format birthday table as text
-    table_header = f"{'Name':<20} | {'Birthday':<10}\n" + ("-" * 33)
-    table_rows = [f"{member['name']:<20} | {member['birthday']:<10}" for member in staff]
-    birthday_table = table_header + "\n" + "\n".join(table_rows)
-
-    # Send birthday table to all admins on startup
+    # Send a short status summary to all admins on startup
+    startup_message = build_startup_message(staff, datetime.now().date())
     for admin in ADMINS:
         user_id = slack.find_user_id(admin)
         if user_id:
-            slack.send_message(user_id, f"Staff Birthday List:\n{birthday_table}")
-            logger.info(f"Sent birthday table to admin {admin}")
+            slack.send_message(user_id, startup_message)
+            logger.info(f"Sent startup summary to admin {admin}")
         else:
             logger.error(f"Could not find Slack user for admin: {admin}")
 
