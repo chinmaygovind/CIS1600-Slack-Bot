@@ -36,9 +36,54 @@ class SlackHelper:
         self.token = os.getenv("SLACK_API_TOKEN")
         self.client = WebClient(token=self.token)
 
-    def send_message(self, channel, body):
+    def send_message(self, channel, body, thread_ts=None):
+        """Post a message; returns its `ts` so replies can be threaded under it."""
         self.logger.info(f"Sending message to channel {channel}")
-        self.client.chat_postMessage(channel=channel, text=body)
+        response = self.client.chat_postMessage(
+            channel=channel, text=body, thread_ts=thread_ts
+        )
+        return response.get("ts")
+
+    def upload_images(self, channel, paths, thread_ts=None, comment=None):
+        """Upload PNGs into a thread. Needs the `files:write` scope.
+
+        Slack ignores `initial_comment` on all but the first upload, so the
+        comment is attached once and the rest follow as bare images.
+        """
+        uploaded = 0
+        for index, path in enumerate(paths):
+            try:
+                self.client.files_upload_v2(
+                    channel=channel,
+                    thread_ts=thread_ts,
+                    file=path,
+                    title=os.path.basename(path),
+                    initial_comment=comment if index == 0 else None,
+                )
+                uploaded += 1
+            except Exception as e:
+                self.logger.error(f"Failed to upload {path}: {e}")
+        return uploaded
+
+    def dm(self, real_name, body):
+        user_id = self.find_user_id(real_name)
+        if not user_id:
+            self.logger.error(f"Could not DM {real_name}: no such Slack user")
+            return False
+        try:
+            self.client.chat_postMessage(channel=user_id, text=body)
+            return True
+        except Exception as e:
+            self.logger.error(f"Could not DM {real_name}: {e}")
+            return False
+
+    def dm_admins(self, body):
+        """DM everyone in ADMINS. Used to surface failures nobody would see."""
+        admins = [a.strip() for a in os.getenv("ADMINS", "").split(",") if a.strip()]
+        if not admins:
+            self.logger.warning("ADMINS is not set; cannot send alert")
+        for admin in admins:
+            self.dm(admin, body)
 
     def find_channel(self, channel_name):
         self.logger.info(f"Finding channel: {channel_name}")

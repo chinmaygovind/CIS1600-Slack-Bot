@@ -40,6 +40,32 @@ Create a `.env` file in the project root with your credentials.
 - `SLACK_CHANNEL`: The Slack channel for Ed notifications (e.g., `ed-notifications`).
 - `REFRESH_INTERVAL_SECONDS`: How often to check for new posts (e.g., `10`).
 
+#### Homework Attachments (`hw_pdfs.py`, used by `ed_module.py`)
+When a new Ed post can be tied to a specific homework problem, the bot replies in
+that Slack message's thread with the problem as it appears in the homework PDF,
+followed by its solution.
+
+- `OVERLEAF_PROJECT_ID`: The Overleaf project id (the hex string in the project URL).
+- `OVERLEAF_GIT_TOKEN`: An Overleaf git token (Account Settings -> Git integration).
+  Requires an Overleaf paid plan.
+- `HW_SYNC_INTERVAL_HOURS`: How often to `git pull` and rebuild (default `12`).
+- `HW_ATTACH_ENABLED`: Set to `false` to post Ed notifications without attachments.
+- `HW_RENDER_DPI`: PNG render resolution (default `110`).
+- `HW_MAX_PAGES`: Cap on pages attached per problem (default `4`).
+
+This needs two system packages and one extra Slack scope:
+
+```bash
+sudo apt install texlive-latex-extra latexmk poppler-utils   # Ubuntu
+```
+
+The Slack app needs the **`files:write`** scope to upload the images, in addition
+to the scopes it already has. Failures (Overleaf unreachable, a homework that
+will not build, an upload that is rejected) are DM'd to `ADMINS` and never block
+the Ed notification itself.
+
+Built PDFs and PNGs are cached under `cache/`, which is gitignored.
+
 #### Birthday Module (`birthday_module.py`)
 - `ADMINS`: A comma-separated list of Slack display names (the profile `real_name`, matched exactly) to notify (e.g. `Chinmay Govind,David Fu`).
 

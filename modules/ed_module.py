@@ -1,82 +1,201 @@
+"""Mirror new Ed posts into Slack, with homework context attached in-thread.
 
-import os
+For every new Ed post the bot posts a notification as before. When the post can
+be tied to a specific homework problem, it then replies in that message's thread
+with the problem as it appears in the homework PDF, followed by its solution.
+
+Homework PDFs come from the course Overleaf project over git; see hw_pdfs.py.
+Matching is regex over the post plus Ed's own category; see hw_match.py.
+
+The attachment step is fully isolated: any failure in the Overleaf sync, the
+LaTeX build, or the upload is logged and DM'd to ADMINS, but never prevents the
+Ed notification itself from going out.
+"""
+
 import asyncio
-
-
-
-
 import os
-import asyncio
 import re
-from edapi import EdAPI
-from utils import SlackHelper, get_logger
+import sys
+import time
+
 from dotenv import load_dotenv
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import hw_match
+import hw_pdfs
+from ed_client import EdClient, EdError
+from utils import SlackHelper, get_logger
 
 load_dotenv()
 
-REGION = os.getenv("ED_REGION")
-COURSE_ID = int(os.getenv("ED_COURSE_ID"))
-ED_API_KEY = os.getenv("ED_API_TOKEN")
 SLACK_CHANNEL = os.getenv("SLACK_CHANNEL", "ed-notifications")
 REFRESH_INTERVAL = int(os.getenv("REFRESH_INTERVAL_SECONDS", "10"))
+HW_SYNC_HOURS = float(os.getenv("HW_SYNC_INTERVAL_HOURS", "12"))
+ATTACH_ENABLED = os.getenv("HW_ATTACH_ENABLED", "true").lower() != "false"
+
 logger = get_logger("ed_module")
 
-def get_link_from_id(id):
-    return f"https://edstem.org/{REGION}/courses/{COURSE_ID}/discussion/" + str(id)
+# Don't re-alert the admins about the same failure every cycle.
+ALERT_COOLDOWN_SECONDS = 3600
+_last_alert = {}
 
-def get_max_thread_number(ed):
-    threads = ed.list_threads(course_id=COURSE_ID, limit=100, sort="new")
-    threads.sort(key=lambda thread: thread["number"], reverse=True)
-    latest_thread = threads[0]
-    return latest_thread["number"], latest_thread["id"]
+
+def alert_admins(slack, key, message):
+    now = time.time()
+    if now - _last_alert.get(key, 0) < ALERT_COOLDOWN_SECONDS:
+        return
+    _last_alert[key] = now
+    logger.error(message)
+    slack.dm_admins(f":warning: *CIS 1600 bot -- {key}*\n{message}")
+
+
+def ed_html_to_slack(text):
+    """Flatten Ed's XML-ish post body into Slack mrkdwn."""
+    text = re.sub(r"</?paragraph>", "\n", text or "")
+    text = re.sub(r"<(/)?(bold|strong)>", "*", text)
+    text = re.sub(r"<(/)?(italic|em)>", "_", text)
+    text = re.sub(r"</?code>", "`", text)
+    text = re.sub(r"</?pre>", "```", text)
+    text = re.sub(r"</?document[^>]*>", "", text)
+    text = re.sub(r"<[^>]+>", "", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def truncate(text, limit=1200):
+    return text if len(text) <= limit else text[:limit].rstrip() + "..."
+
+
+def attach_homework(slack, channel_id, thread_ts, thread):
+    """Reply in-thread with the referenced problem and its solution."""
+    homework, problem, part = hw_match.match(
+        thread.get("title", ""),
+        thread.get("document") or thread.get("content") or "",
+        thread.get("subcategory"),
+    )
+    if not homework or not problem:
+        logger.info(
+            f"No homework problem identified for thread #{thread.get('number')} "
+            f"(homework={homework}, problem={problem})"
+        )
+        return
+
+    label = f"{homework} Q{problem}{part or ''}"
+    questions, solutions, note = hw_pdfs.problem_attachments(homework, problem)
+
+    if not questions and not solutions:
+        logger.info(f"Nothing to attach for {label}: {note}")
+        return
+
+    slack.upload_images(
+        channel_id, questions, thread_ts=thread_ts,
+        comment=f":page_facing_up: *Homework {label} -- problem*",
+    )
+    if solutions:
+        slack.upload_images(
+            channel_id, solutions, thread_ts=thread_ts,
+            comment=f":white_check_mark: *Homework {label} -- solution*",
+        )
+    elif note:
+        slack.send_message(channel_id, f"_{note}_", thread_ts=thread_ts)
+    logger.info(
+        f"Attached {label} to thread #{thread.get('number')}: "
+        f"{len(questions)} problem page(s), {len(solutions)} solution page(s)"
+    )
+
+
+def announce(slack, channel_id, ed, thread):
+    body = ed_html_to_slack(thread.get("document") or thread.get("content") or "")
+    message = (
+        f"*New Ed Post (#{thread['number']}): {thread.get('title', '')}*\n"
+        f"{truncate(body)}\n"
+        f"Link: {ed.thread_url(thread['id'])}"
+    )
+    return slack.send_message(channel_id, message)
+
+
+async def homework_sync_loop(slack):
+    """Pull the Overleaf project and rebuild changed homeworks, every 12h."""
+    while True:
+        try:
+            built, errors = await asyncio.to_thread(hw_pdfs.sync_and_build)
+            if built:
+                logger.info(f"Rebuilt homeworks: {', '.join(built)}")
+            if errors:
+                alert_admins(
+                    slack, "homework build",
+                    "Some homeworks failed to build:\n" + "\n".join(errors[:10]),
+                )
+        except Exception as e:
+            alert_admins(slack, "Overleaf sync", f"Could not sync homework PDFs: {e}")
+        await asyncio.sleep(HW_SYNC_HOURS * 3600)
+
+
+async def poll_ed(slack, channel_id, ed):
+    threads = await asyncio.to_thread(ed.list_threads, 50, 0, "new")
+    if not threads:
+        return
+    last_seen = max(t["number"] for t in threads)
+    logger.info(f"Watching Ed from post #{last_seen}")
+    slack.send_message(channel_id, "EdModule initialized!")
+
+    while True:
+        try:
+            threads = await asyncio.to_thread(ed.list_threads, 50, 0, "new")
+            fresh = sorted(
+                (t for t in threads if t["number"] > last_seen),
+                key=lambda t: t["number"],
+            )
+            for summary in fresh:
+                # The list endpoint truncates bodies; fetch the full post.
+                try:
+                    thread = await asyncio.to_thread(ed.get_thread, summary["id"])
+                except EdError:
+                    thread = summary
+                thread.setdefault("number", summary["number"])
+                thread.setdefault("id", summary["id"])
+                thread.setdefault("subcategory", summary.get("subcategory"))
+
+                thread_ts = announce(slack, channel_id, ed, thread)
+                last_seen = max(last_seen, thread["number"])
+
+                if ATTACH_ENABLED and thread_ts:
+                    try:
+                        await asyncio.to_thread(
+                            attach_homework, slack, channel_id, thread_ts, thread
+                        )
+                    except Exception as e:
+                        alert_admins(
+                            slack, "homework attachment",
+                            f"Could not attach homework for Ed post "
+                            f"#{thread['number']}: {e}",
+                        )
+        except EdError as e:
+            alert_admins(slack, "Ed API", str(e))
+        except Exception as e:
+            logger.error(f"Error in EdModule: {e}")
+        await asyncio.sleep(REFRESH_INTERVAL)
+
 
 async def main():
     slack = SlackHelper("ed_module")
-    ed = EdAPI()
+    ed = EdClient()
     channel_id = slack.find_channel(SLACK_CHANNEL)
-    last_thread, _ = get_max_thread_number(ed)
-    slack.send_message(channel_id, "EdModule initialized!")
-    while True:
-        try:
-            updated_last_thread, id = get_max_thread_number(ed)
-            thread = ed.get_thread(id)
-            thread_title = thread["title"]
-            thread_content = thread["content"]
-            # Convert common Ed HTML tags to Slack formatting
-            def ed_html_to_slack(text):
-                # Replace paragraphs with newlines
-                text = re.sub(r'</?paragraph>', '\n', text)
-                # Replace <b> and <strong> with *bold*
-                text = re.sub(r'<(/)?(bold|strong)>', '*', text)
-                # Replace <i> and <em> with _italic_
-                text = re.sub(r'<(/)?(italic|em)>', '_', text)
-                # Replace <code> with backticks
-                text = re.sub(r'<code>', '`', text)
-                text = re.sub(r'</code>', '`', text)
-                # Replace <pre> with triple backticks
-                text = re.sub(r'<pre>', '```', text)
-                text = re.sub(r'</pre>', '```', text)
-                # Remove <document> tags
-                text = re.sub(r'</?document[^>]*>', '', text)
-                # Remove any remaining tags (optional, or leave as is)
-                return text.strip()
+    if not channel_id:
+        logger.error(f"Channel #{SLACK_CHANNEL} not found; is the bot invited?")
+        raise SystemExit(1)
 
-            formatted_content = ed_html_to_slack(thread_content)
-            if updated_last_thread > last_thread:
-                message = (
-                    f"*New Ed Post (#{updated_last_thread}): {thread_title}*\n"
-                    f"{formatted_content}\n"
-                    f"Link: {get_link_from_id(id)}"
-                )
-                slack.send_message(channel_id, message)
-                last_thread = updated_last_thread
-                logger.info(f"New thread, sent message {message}")
-            # logger.info(f"last seen thread: {last_thread} with link {get_link_from_id(id)}. Title: {thread_title}")
-            await asyncio.sleep(REFRESH_INTERVAL)
-        except Exception as e:
-            logger.error(f"Error in EdModule: {e}")
-            await asyncio.sleep(REFRESH_INTERVAL)
+    try:
+        logger.info(f"Ed API authenticated as {ed.whoami()}")
+    except EdError as e:
+        alert_admins(slack, "Ed API", f"Could not authenticate with Ed: {e}")
+        raise SystemExit(1)
+
+    tasks = [poll_ed(slack, channel_id, ed)]
+    if ATTACH_ENABLED:
+        tasks.append(homework_sync_loop(slack))
+    await asyncio.gather(*tasks)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
