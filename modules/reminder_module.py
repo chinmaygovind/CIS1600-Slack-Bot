@@ -13,7 +13,7 @@ SYS_ADMIN = os.getenv("SYS_ADMIN")
 CHECK_INTERVAL = 60  # seconds
 logger = get_logger("reminder_module")
 
-REMINDER_MESSAGE = "Reminder to submit hours on Workday by 6PM!"
+REMINDER_MESSAGE = "<!channel> Remember to send screenshot totals of your hours to heads by tonight!"
 # REMINDER_MESSAGE = "test message"
 
 async def main():
@@ -32,8 +32,8 @@ async def main():
     while True:
         now = datetime.now(tz=eastern)
         logger.debug(f"Current time (Eastern): {now}, sent_this_week: {sent_this_week}")
-        # Sunday is 6 (Monday=0, Sunday=6)
-        if now.weekday() == 6 and now.hour == 16:
+        # Saturday is 5 (Monday=0, Sunday=6)
+        if now.weekday() == 5 and now.hour == 12:
             if not sent_this_week:
                 channel_id = slack.find_channel(CHANNEL)
                 if channel_id:
@@ -43,11 +43,10 @@ async def main():
                     logger.error(f"Could not find Slack channel: {CHANNEL}")
                 sent_this_week = True
         else:
-            # Reset flag after Sunday 5PM
-            if now.weekday() != 6 or now.hour > 17:
-                if sent_this_week:
-                    logger.debug("Resetting sent_this_week flag.")
-                sent_this_week = False
+            # Outside the Saturday noon hour, arm for next week
+            if sent_this_week:
+                logger.debug("Resetting sent_this_week flag.")
+            sent_this_week = False
         await asyncio.sleep(CHECK_INTERVAL)
         logger.debug("Sleeping for CHECK_INTERVAL seconds.")
 
