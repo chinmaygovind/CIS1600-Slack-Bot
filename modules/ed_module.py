@@ -39,6 +39,8 @@ logger = get_logger("ed_module")
 # Don't re-alert the admins about the same failure every cycle.
 ALERT_COOLDOWN_SECONDS = 3600
 _last_alert = {}
+# Ed/Cloudflare throws brief 502s; only alert once polling has failed this long.
+ED_OUTAGE_ALERT_SECONDS = int(os.getenv("ED_OUTAGE_ALERT_SECONDS", "600"))
 
 
 def alert_admins(slack, key, message):
@@ -139,6 +141,7 @@ async def poll_ed(slack, channel_id, ed):
     logger.info(f"Watching Ed from post #{last_seen}")
     slack.send_message(channel_id, "EdModule initialized!")
 
+    failing_since = None
     while True:
         try:
             threads = await asyncio.to_thread(ed.list_threads, 50, 0, "new")
@@ -170,8 +173,17 @@ async def poll_ed(slack, channel_id, ed):
                             f"Could not attach homework for Ed post "
                             f"#{thread['number']}: {e}",
                         )
+            failing_since = None
         except EdError as e:
-            alert_admins(slack, "Ed API", str(e))
+            failing_since = failing_since or time.time()
+            down_for = time.time() - failing_since
+            if down_for >= ED_OUTAGE_ALERT_SECONDS:
+                alert_admins(
+                    slack, "Ed API",
+                    f"{e} (failing for {int(down_for // 60)} min)",
+                )
+            else:
+                logger.warning(f"Ed poll failed, will retry: {e}")
         except Exception as e:
             logger.error(f"Error in EdModule: {e}")
         await asyncio.sleep(REFRESH_INTERVAL)
